@@ -20,7 +20,7 @@ public static class Patcher
 
     public static void Patch()
     {
-        new Harmony("qk.buttonmesser").PatchAll();
+        new Harmony("qkrisi.buttonmesser").PatchAll();
     }
 }
 
@@ -61,10 +61,17 @@ public class PressPatch
     {
         Selectable parented = Patcher.GetParent(__instance);
         var messer = Patcher.GetMeser((parented.Parent == null ? parented : parented.Parent).GetComponent<BombComponent>());
-        if (messer != null)
-        {
+        if (messer != null && messer._enable)
+        {    
+            if (messer._forced)
+            {
+                if(__instance.GetComponent<Messed>()!=null) messer.DestroyObject(__instance.GetComponent<Messed>());
+                __state = messer;
+                return true;
+            }
             if(messer.AvoidStrike.Contains(__instance))
             {
+                messer.SubmitButton(__instance);
                 StrikePatch.striked = __instance;
                 __state = messer;
                 return true;

@@ -7,13 +7,13 @@ using Assets.Scripts.Missions;
 using RNG = UnityEngine.Random;
 
 public class qkButtonMesser : MonoBehaviour {
-    
+
     private Bomb FindSelfBomb()
     {
         var bombs = FindObjectsOfType<Bomb>();
-        foreach(Bomb bomb in bombs)
+        foreach (Bomb bomb in bombs)
         {
-            foreach(BombComponent module in bomb.GetComponentsInChildren<BombComponent>(true))
+            foreach (BombComponent module in bomb.GetComponentsInChildren<BombComponent>(true))
             {
                 if (module == GetComponent<BombComponent>()) return bomb;
             }
@@ -41,15 +41,22 @@ public class qkButtonMesser : MonoBehaviour {
 
     private Bomb SelfBomb;
 
-    private GameObject _currentButton = null;
-
     private BombComponent[] selfModules = new BombComponent[] { };
     private List<Selectable> Selectables = new List<Selectable>();
+
+    private Dictionary<Selectable, Transform> Cameras = new Dictionary<Selectable, Transform>();
 
     private Dictionary<Selectable, Func<bool>> Interactions = new Dictionary<Selectable, Func<bool>>();
     private Dictionary<Selectable, Action> InteractEnds = new Dictionary<Selectable, Action>();
     private List<Selectable> EnabledButtons = new List<Selectable>();
     private List<int> Indexes = new List<int>();
+
+    private const int cameraLayer = 29;
+    private Transform cam;
+    private Dictionary<GameObject, int> ObjectLayers = new Dictionary<GameObject, int>();
+
+    private Vector3 buttonPosition { get; set; }
+    private Quaternion buttonRotation { get; set; }
 
     [HideInInspector]
     public List<Selectable> UnlockedSelectables = new List<Selectable>();
@@ -62,16 +69,17 @@ public class qkButtonMesser : MonoBehaviour {
 
     private readonly string[] Ignoreds = new[]
     {
-        "Challenge & Contact",
-        "Wire Sequence"
+        "Challenge & Contact"
     };
 
     private readonly ModHandler[] SeparateHandle = new ModHandler[]
     {
-        new ModHandler(typeof(SnippableWire), true),
-        new ModHandler(typeof(VennSnippableWire), true),
+        new ModHandler(typeof(SnippableWire)),
+        new ModHandler(typeof(VennSnippableWire)),
         new ModHandler(typeof(WireSequenceWire))
     };
+
+    public bool _enable = false;
 
     private List<int> Availables
     {
@@ -91,35 +99,31 @@ public class qkButtonMesser : MonoBehaviour {
     [HideInInspector]
     public int moduleID;
 
-    private GameObject CurrentButton
-    {
-        get
-        {
-            return _currentButton;
-        }
-        set
-        {
-            if (_currentButton != null) Destroy(CurrentButton);
-            _currentButton = Instantiate(value, FindFromRoot("CloneWrapper").transform);
-            var selectable = _currentButton.GetComponent<Selectable>();
-            selectable.Parent = null;
-            selectable.Highlight = null;
-            selectable.Children = new Selectable[] { };
-            selectable.ChildRowLength = 0;
-            selectable.enabled = false;
-            _currentButton.transform.position = new Vector3(0,0,0);
-            _currentButton.transform.rotation = value.transform.rotation;
-            foreach (Transform t in _currentButton.transform) t.localPosition = new Vector3(0, t.localPosition.y, 0);
-            _currentButton.transform.localPosition = new Vector3(0,0,0);
-            _currentButton.transform.localRotation = new Quaternion(value.transform.localRotation.x, value.transform.localRotation.y + 180, value.transform.localRotation.z, value.transform.localRotation.w);
-        }
-    }
-
     [HideInInspector]
     public int _done = 0;
 
-    private bool _forced = false;
+    public bool _forced = false;
+    private bool ButtonSolved = false;
     private bool _solve = false;
+    private bool Pressable = false;
+
+    private bool _Enabled => SelfBomb == null || moduleID !=
+        SelfBomb.GetComponentsInChildren<qkButtonMesser>(true).OrderByDescending(x => x.moduleID).ToList()[0].moduleID;
+
+    private void ChangeLayer(GameObject obj, bool reset = false)
+    {
+        if (!reset)
+        {
+            ObjectLayers.Add(obj, obj.layer);
+            obj.layer = cameraLayer;
+        }
+        else
+        {
+            obj.layer = ObjectLayers[obj];
+            ObjectLayers.Remove(obj);
+        }
+        foreach (Transform t in obj.transform) ChangeLayer(t.gameObject, reset);
+    }
 
     private GameObject FindFromRoot(string _name)
     {
@@ -128,12 +132,7 @@ public class qkButtonMesser : MonoBehaviour {
 
     private bool CheckSolve()
     {
-        if (Selectables.Count-EnabledButtons.Count == 0)
-        {
-            if (CurrentButton != null) Destroy(_currentButton);
-            return true;
-        }
-        return false;
+        return Selectables.Count - EnabledButtons.Count == 0;
     }
 
     private void Logger(string msg)
@@ -141,14 +140,15 @@ public class qkButtonMesser : MonoBehaviour {
         Debug.LogFormat("[Button Messer #{0}] {1}", moduleID, msg);
     }
 
-    private void SubmitButton(Selectable button)
+    public void SubmitButton(Selectable button)
     {
         if (_forced || EnabledButtons.Contains(button)) return;
         EnabledButtons.Add(button);
         var available = Availables;
         int ind = available[RNG.Range(0, available.Count)];
         Indexes.Add(ind);
-        var messComponent = Selectables[ind].gameObject.AddComponent<Messed>();
+        Messed messComponent = null;
+        messComponent = Selectables[ind].gameObject.AddComponent<Messed>();
         if (Interactions[Selectables[ind]] != null)
         {
             Selectables[ind].OnInteract = () =>
@@ -172,53 +172,109 @@ public class qkButtonMesser : MonoBehaviour {
             AvoidVanilla.Remove(Selectables[ind]);
         }
         UnlockedSelectables.Add(Selectables[ind]);
-        CurrentButton = Selectables[ind].gameObject;
-        if (CheckSolve()) GetComponent<KMBombModule>().HandlePass();
+        var ButtonTransform = Selectables[ind].transform;
+        cam.transform.SetParent(Cameras[Selectables[ind]], false);
+        
+        StartCoroutine(RenderButton(Selectables[ind].gameObject));
+        if (CheckSolve()) GetComponent<KMBombModule>().HandlePass();    
+    }
+
+    private IEnumerator RenderButton(GameObject button)
+    {
+        ChangeLayer(button);
+        yield return new WaitForEndOfFrame();
+        RenderTexture rt = new RenderTexture(256, 256, 24);
+        Camera camObject = cam.GetComponent<Camera>();
+        camObject.targetTexture = rt;
+        Texture2D pic = new Texture2D(256, 256, TextureFormat.RGB24, false);
+        camObject.Render();
+        RenderTexture.active = rt;
+        pic.ReadPixels(new Rect(0, 0, 256, 256), 0, 0);
+        pic.Apply();
+        camObject.targetTexture = null;
+        RenderTexture.active = null;
+        Destroy(rt);
+        FindFromRoot("Display").GetComponent<Renderer>().material.mainTexture = pic;
+        yield return null;
+        ChangeLayer(button, true);
     }
 
     public void Start()
     {
         moduleID = ++_counter;
+        GetComponent<KMBossModule>().GetIgnoredModules("Button Messer", new string[] {"Button Messer"});
         SelfBomb = FindSelfBomb();
         var solveBTN = FindFromRoot("SolveButton");
         var handler = GetComponent<KMBombModule>();
+        solveBTN.GetComponent<Selectable>().OnInteract += () =>
+        {
+            if (!Pressable) return false;
+            StopCoroutine(Starter(solveBTN));
+            handler.GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, solveBTN.transform);
+            solveBTN.GetComponent<KMSelectable>().AddInteractionPunch(.5f);
+            ButtonSolved = true;
+            handler.HandlePass();
+            return false;
+        };
         GetComponent<KMBombModule>().OnActivate += () =>
         {
-            solveBTN.GetComponent<Selectable>().OnInteract += () =>
+            Pressable = true;
+            for (int i = 1; i <= 31; i++)
             {
-                handler.GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, solveBTN.transform);
-                solveBTN.GetComponent<KMSelectable>().AddInteractionPunch(.5f);
-                if (_solve) handler.HandlePass();
-                return false;
-            };
+                if (i == cameraLayer) continue;
+                Physics.IgnoreLayerCollision(cameraLayer, i, Physics.GetIgnoreLayerCollision(solveBTN.layer, i));
+            }
+            cam = FindFromRoot("BCam").transform;
+            cam.GetComponent<Camera>().cullingMask = ~cameraLayer;
+            buttonPosition = FindFromRoot("PosState").transform.position;
+            Destroy(FindFromRoot("PosState"));
+            buttonRotation = FindFromRoot("SolveButton").transform.rotation;
         };
-        Debug.LogFormat("[Button Messer #{0}] {1}", moduleID, SelfBomb == null || moduleID != SelfBomb.GetComponentsInChildren<qkButtonMesser>(true).OrderByDescending(x => x.moduleID).ToList()[0].moduleID);
-        if (SelfBomb==null || moduleID != SelfBomb.GetComponentsInChildren<qkButtonMesser>(true).OrderByDescending(x => x.moduleID).ToList()[0].moduleID)
-        {
-            _solve = true;
-            return;
-        }
-        solveBTN.SetActive(false);
         selfModules = SelfBomb.GetComponentsInChildren<BombComponent>(true).Where(m => m.ComponentType != ComponentTypeEnum.Empty && m.ComponentType != ComponentTypeEnum.Timer && !Ignoreds.Contains(m.GetModuleDisplayName())).ToArray();
         foreach (BombComponent module in selfModules)
         {
-            Selectables = Selectables.Concat(module.GetComponentsInChildren<Selectable>(true).Where(s => s.GetComponent<BombComponent>() == null && s.Parent != null && s.Parent.GetComponent<Bomb>() == null && s.GetComponent<ButtonMesser.messerOverride>() == null)).ToList();
-        }
-        foreach(ModHandler type in SeparateHandle)
-        {
-            Selectables = Selectables.Concat(SelfBomb.GetComponentsInChildren(type.t, type.Inactive).Select(x => x.GetComponent<Selectable>())).ToList();
+            Transform ModuleCamera = SetupCamera(module);
+            foreach (var selectable in module.GetComponentsInChildren<Selectable>(true).Where(s =>
+                s.GetComponent<BombComponent>() == null && s.Parent != null && s.Parent.GetComponent<Bomb>() == null &&
+                s.GetComponent<ButtonMesser.messerOverride>() == null))
+            {
+                Selectables.Add(selectable);
+                Cameras.Add(selectable, ModuleCamera);
+            }
+            foreach(ModHandler type in SeparateHandle)
+            {
+                foreach(var selectable in module.GetComponentsInChildren(type.t, type.Inactive).Select(x => x.GetComponent<Selectable>()))
+                {
+                    Selectables.Add(selectable);
+                    Cameras.Add(selectable, ModuleCamera);
+                }
+            }
         }
         Selectables = Selectables.Distinct().ToList();
         Selectables = Shuffle(Selectables);
-        StartCoroutine(Starter());
+        StartCoroutine(Starter(solveBTN));
     }
 
-    private IEnumerator Starter()
+    private IEnumerator Starter(GameObject solveBTN)
     {
         yield return new WaitUntil(() => _done >= GetComponent<KMBombInfo>().GetModuleNames().Count);
         yield return null;
-        Debug.LogFormat("Number of selectables: {0}, All selectables: {1}", Selectables.Count, SelfBomb.GetComponentsInChildren<SnippableWire>(true).Select(x => x.GetComponent<Selectable>()).ToList().Any(x => x==null));
+        solveBTN.SetActive(false);
+        _enable = true;
+        List<Selectable> remove = new List<Selectable>();
         foreach(Selectable selectable in Selectables)
+        {
+            try
+            {
+                Destroy(selectable.gameObject.AddComponent<Messed>());
+            }
+            catch(NullReferenceException)
+            {
+                remove.Add(selectable);
+            }
+        }
+        foreach (Selectable r in remove) Selectables.Remove(r);
+        foreach (Selectable selectable in Selectables)
         {
             Func<bool> f = selectable.OnInteract == null ? null : new Func<bool>(selectable.OnInteract);
             if (f == null) AvoidVanilla.Add(selectable);
@@ -229,6 +285,7 @@ public class qkButtonMesser : MonoBehaviour {
         if (CheckSolve())
         {
             _solve = true;
+            FindFromRoot("Display").SetActive(false);
             FindFromRoot("SolveButton").SetActive(true);
             yield break;
         }
@@ -239,40 +296,71 @@ public class qkButtonMesser : MonoBehaviour {
 		if(Interactions[Selectables[index]]==null) Selectables[index].OnInteract = null;
 		else
 		{
-			Selectables[index].OnInteract = () => { return Interactions[Selectables[index]](); };
+			Selectables[index].OnInteract = () => Interactions[Selectables[index]]();
 		}
         UnlockedSelectables.Add(Selectables[index]);
     }
 
+    public void DestroyObject(Component obj)
+    {
+        Destroy(obj);
+    }
+    
     public void ResetAll()
     {
+        Logger("ResetAll called");
+        if (ButtonSolved) return;
+        Logger("Got trough");
         _forced = true;
-        for(int i = 0;i<Selectables.Count;i++)
-        {
-            SetInteract(i);
-        }
+        FindFromRoot("Display").SetActive(false);
+        for (int i = 0; i < Selectables.Count; i++) SetInteract(i);
     }
 
     public void Update()
     {
         if (GetComponent<KMBombInfo>().GetSolvableModuleIDs().All(module => module == "qkButtonMesser")) GetComponent<KMBombModule>().HandlePass();
     }
+    
+    private Transform SetupCamera(BombComponent module)        //Origin: TwitchPlays
+    {
+        Transform _cam = module.transform.Find("MesserCamera");
+        if (_cam == null)
+        {
+            _cam = new GameObject().transform;
+            _cam.name = "MesserCamera";
+            _cam.SetParent(module.transform, false);
+        }
+        return _cam;
+    }
 
-#pragma warning disable 414
+    public void TwitchHandleForcedSolve()
+    {
+        var btn = FindFromRoot("SolveButton");
+        if (Pressable && btn.activeInHierarchy) btn.GetComponent<Selectable>().OnInteract();
+        else GetComponent<KMBombModule>().HandlePass();
+    }
+    
+    #pragma warning disable 414
     [HideInInspector]
     public string TwitchHelpMessage = "Use '!{0} press solve' if the solve button is present!";
-#pragma warning restore 414
+    #pragma warning restore 414
     public IEnumerator ProcessTwitchCommand(string command)
     {
         if(command.ToLowerInvariant()=="press solve")
         {
             yield return null;
-            if(!_solve)
+            if (!Pressable)
+            {
+                yield return "sendtochaterror Button Messer didn't load yet!";
+                yield break;
+            }
+            var button = FindFromRoot("SolveButton");
+            if(!button.activeInHierarchy)
             {
                 yield return "sendtochaterror The solve button isn't active!";
                 yield break;
             }
-            FindFromRoot("SolveButton").GetComponent<Selectable>().OnInteract();
+            button.GetComponent<Selectable>().OnInteract();
         }
     }
 }
