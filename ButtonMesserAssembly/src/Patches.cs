@@ -46,12 +46,8 @@ public class StrikePatch
 
     public static bool Prefix(BombComponent __instance)
     {
-        UnityEngine.Debug.LogFormat("[Buggon Messer] {0}", striked==null);
         if (striked == null) return true;
         var messer = Patcher.GetMeser(__instance);
-        UnityEngine.Debug.LogFormat("[Button Messer] {0} {1} {2}", messer == null,
-            messer == null ? false : messer.EnabledButtons.Contains(striked),
-            striked.GetComponent<Messed>() == null);
         return messer==null || messer.EnabledButtons.Contains(striked) || striked.GetComponent<Messed>() == null;
     }
 }
