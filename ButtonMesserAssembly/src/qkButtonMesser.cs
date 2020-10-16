@@ -48,7 +48,7 @@ public class qkButtonMesser : MonoBehaviour {
 
     private Dictionary<Selectable, Func<bool>> Interactions = new Dictionary<Selectable, Func<bool>>();
     private Dictionary<Selectable, Action> InteractEnds = new Dictionary<Selectable, Action>();
-    private List<Selectable> EnabledButtons = new List<Selectable>();
+    public List<Selectable> EnabledButtons = new List<Selectable>();
     private List<int> Indexes = new List<int>();
 
     private const int cameraLayer = 29;
@@ -153,10 +153,10 @@ public class qkButtonMesser : MonoBehaviour {
         {
             Selectables[ind].OnInteract = () =>
             {
-                SubmitButton(Selectables[ind]);
                 StrikePatch.striked = Selectables[ind];
                 bool ret = Interactions[Selectables[ind]]();
                 StrikePatch.striked = null;
+                SubmitButton(Selectables[ind]);
                 if (messComponent != null)
                 {
                     Destroy(messComponent);
@@ -172,9 +172,7 @@ public class qkButtonMesser : MonoBehaviour {
             AvoidVanilla.Remove(Selectables[ind]);
         }
         UnlockedSelectables.Add(Selectables[ind]);
-        var ButtonTransform = Selectables[ind].transform;
         cam.transform.SetParent(Cameras[Selectables[ind]], false);
-        
         StartCoroutine(RenderButton(Selectables[ind].gameObject));
         if (CheckSolve()) GetComponent<KMBombModule>().HandlePass();    
     }
@@ -195,7 +193,7 @@ public class qkButtonMesser : MonoBehaviour {
         RenderTexture.active = null;
         Destroy(rt);
         FindFromRoot("Display").GetComponent<Renderer>().material.mainTexture = pic;
-        yield return null;
+        yield return new WaitForEndOfFrame();
         ChangeLayer(button, true);
     }
 
@@ -225,7 +223,7 @@ public class qkButtonMesser : MonoBehaviour {
                 Physics.IgnoreLayerCollision(cameraLayer, i, Physics.GetIgnoreLayerCollision(solveBTN.layer, i));
             }
             cam = FindFromRoot("BCam").transform;
-            cam.GetComponent<Camera>().cullingMask = ~cameraLayer;
+            cam.GetComponent<Camera>().cullingMask = 1 << cameraLayer;
             buttonPosition = FindFromRoot("PosState").transform.position;
             Destroy(FindFromRoot("PosState"));
             buttonRotation = FindFromRoot("SolveButton").transform.rotation;

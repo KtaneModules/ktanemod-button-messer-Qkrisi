@@ -4,6 +4,8 @@ using HarmonyLib;
 
 public static class Patcher
 {
+    private static bool _patched = false;
+
     public static qkButtonMesser GetMeser(BombComponent __instance)
     {
         if (__instance == null) return null;
@@ -20,7 +22,11 @@ public static class Patcher
 
     public static void Patch()
     {
-        new Harmony("qkrisi.buttonmesser").PatchAll();
+        if (!_patched)
+        {
+            _patched = true;
+            new Harmony("qkrisi.buttonmesser").PatchAll();
+        }
     }
 }
 
@@ -40,7 +46,13 @@ public class StrikePatch
 
     public static bool Prefix(BombComponent __instance)
     {
-        return striked==null || striked.GetComponent<Messed>() == null;
+        UnityEngine.Debug.LogFormat("[Buggon Messer] {0}", striked==null);
+        if (striked == null) return true;
+        var messer = Patcher.GetMeser(__instance);
+        UnityEngine.Debug.LogFormat("[Button Messer] {0} {1} {2}", messer == null,
+            messer == null ? false : messer.EnabledButtons.Contains(striked),
+            striked.GetComponent<Messed>() == null);
+        return messer==null || messer.EnabledButtons.Contains(striked) || striked.GetComponent<Messed>() == null;
     }
 }
 
@@ -71,7 +83,6 @@ public class PressPatch
             }
             if(messer.AvoidStrike.Contains(__instance))
             {
-                messer.SubmitButton(__instance);
                 StrikePatch.striked = __instance;
                 __state = messer;
                 return true;
@@ -101,6 +112,7 @@ public class PressPatch
         if (__state != null)
         {
             StrikePatch.striked = null;
+            __state.SubmitButton(__instance);
             __state.AvoidStrike.Remove(__instance);
         }
     }

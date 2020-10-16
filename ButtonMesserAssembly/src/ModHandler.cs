@@ -2,8 +2,8 @@
 
 public class ModHandler
 {
-    public Type t { get; private set; }
-    public bool Inactive { get; private set; }
+    public readonly Type t;
+    public readonly bool Inactive;
 
     public ModHandler(Type type, bool inactive = false)
     {
