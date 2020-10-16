@@ -74,7 +74,7 @@ public class PressPatch
             if (messer._forced)
             {
                 if(__instance.GetComponent<Messed>()!=null) messer.DestroyObject(__instance.GetComponent<Messed>());
-                __state = messer;
+                __state = null;
                 return true;
             }
             if(messer.AvoidStrike.Contains(__instance))

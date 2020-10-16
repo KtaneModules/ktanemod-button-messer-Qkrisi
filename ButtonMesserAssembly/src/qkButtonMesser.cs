@@ -306,9 +306,7 @@ public class qkButtonMesser : MonoBehaviour {
     
     public void ResetAll()
     {
-        Logger("ResetAll called");
         if (ButtonSolved) return;
-        Logger("Got trough");
         _forced = true;
         FindFromRoot("Display").SetActive(false);
         for (int i = 0; i < Selectables.Count; i++) SetInteract(i);
