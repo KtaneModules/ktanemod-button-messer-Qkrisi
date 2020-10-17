@@ -69,7 +69,15 @@ public class qkButtonMesser : MonoBehaviour {
 
     private readonly string[] Ignoreds = new[]
     {
-        "Challenge & Contact"
+        "Challenge & Contact",
+        "Countdown",
+        "Cruel Countdown",
+        "Micro-Modules",
+        "Only Connect",
+        "Risky Wires",
+        "Rubik's Clock",
+        "The Modkit",
+        "Ultimate Custom Night"
     };
 
     private readonly ModHandler[] SeparateHandle = new ModHandler[]
@@ -234,7 +242,7 @@ public class qkButtonMesser : MonoBehaviour {
         foreach (BombComponent module in selfModules)
         {
             Transform ModuleCamera = SetupCamera(module);
-            foreach (var selectable in module.GetComponentsInChildren<Selectable>(true).Where(s =>
+            foreach (var selectable in module.GetComponentsInChildren<Selectable>(false).Where(s =>
                 s.GetComponent<BombComponent>() == null && s.Parent != null && s.Parent.GetComponent<Bomb>() == null &&
                 s.GetComponent<ButtonMesser.messerOverride>() == null))
             {

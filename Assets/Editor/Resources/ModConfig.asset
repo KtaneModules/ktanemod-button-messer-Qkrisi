@@ -14,7 +14,27 @@ MonoBehaviour:
   id: qkButtonMesser
   title: Button Messer
   author: Qkrisi
-  description: Button Messer module
-  version: 0.1
+  description: 'Please don''t kill me for this!
+
+
+    This module disabled every button on the module, but everytime you click one,
+    another one gets unlocked.
+
+    Unlock all buttons on the bomb to solve the module!
+
+
+
+    Twitch Plays supported (well... yeah...)
+
+
+    ModuleID: qkButtonMesser
+
+    Manual: https://ktane.timwi.de/HTML/Button%20Messer.html
+
+    Source Code: https://github.com/Qkrisi/ktanemod-button-messer/
+
+
+    Module by Qkrisi'
+  version: 1.0
   outputFolder: build
-  previewImage: {fileID: 0}
+  previewImage: {fileID: 2800000, guid: 7987741cce5a446bbb8c979c729a8964, type: 3}
