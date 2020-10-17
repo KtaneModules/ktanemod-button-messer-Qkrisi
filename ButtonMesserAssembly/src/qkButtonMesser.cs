@@ -144,9 +144,11 @@ public class qkButtonMesser : MonoBehaviour {
     {
         if (_forced || EnabledButtons.Contains(button)) return;
         EnabledButtons.Add(button);
+        Logger($"Pressed button: {button.name}");
         var available = Availables;
         int ind = available[RNG.Range(0, available.Count)];
         Indexes.Add(ind);
+        Logger($"Enabled button: {Selectables[ind].name}");
         Messed messComponent = null;
         messComponent = Selectables[ind].gameObject.AddComponent<Messed>();
         if (Interactions[Selectables[ind]] != null)
@@ -272,6 +274,7 @@ public class qkButtonMesser : MonoBehaviour {
             }
         }
         foreach (Selectable r in remove) Selectables.Remove(r);
+        Logger($"Number of messable buttons: {Selectables.Count}");
         foreach (Selectable selectable in Selectables)
         {
             Func<bool> f = selectable.OnInteract == null ? null : new Func<bool>(selectable.OnInteract);
