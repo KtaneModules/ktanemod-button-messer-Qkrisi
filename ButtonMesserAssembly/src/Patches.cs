@@ -1,4 +1,8 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 using log4net;
 using HarmonyLib;
 
@@ -43,12 +47,22 @@ public class SolvePatch
 public class StrikePatch
 {
     public static Selectable striked = null;
+    public static List<BombComponent> CoroutineStrikes = new List<BombComponent>();
+
+    public static bool IsEnabled(BombComponent instance)
+    {
+        var messer = Patcher.GetMeser(instance);
+        return messer == null || messer.EnabledButtons.Contains(striked) || striked.GetComponent<Messed>() == null;
+    }
 
     public static bool Prefix(BombComponent __instance)
     {
-        if (striked == null) return true;
-        var messer = Patcher.GetMeser(__instance);
-        return messer==null || messer.EnabledButtons.Contains(striked) || striked.GetComponent<Messed>() == null;
+        if(CoroutineStrikes.Contains(__instance))
+        {
+            CoroutineStrikes.Remove(__instance);
+            return false;
+        }
+        return striked==null || IsEnabled(__instance);
     }
 }
 
@@ -111,6 +125,25 @@ public class PressPatch
             __state.SubmitButton(__instance);
             __state.AvoidStrike.Remove(__instance);
         }
+    }
+}
+
+[HarmonyPatch(typeof(MonoBehaviour), "StartCoroutine", typeof(IEnumerator))]
+public class CoroutinePatch
+{
+    private static IEnumerator PatchedRoutine(IEnumerator BaseRoutine, BombComponent AvoidStrike)
+    {
+        StrikePatch.CoroutineStrikes.Add(AvoidStrike);
+        yield return BaseRoutine;
+        StrikePatch.CoroutineStrikes.Remove(AvoidStrike);
+    }
+
+    public static void Prefix(MonoBehaviour __instance, ref IEnumerator routine)
+    {
+        if (StrikePatch.striked == null) return;
+        var component = __instance.GetComponent<BombComponent>();
+        if (StrikePatch.IsEnabled(component)) return;
+        routine = PatchedRoutine(routine, component);
     }
 }
 

@@ -14,7 +14,7 @@ MonoBehaviour:
   id: qkButtonMesser
   title: Button Messer
   author: Qkrisi
-  description: Yep
+  description: Button Messer module
   version: 0.1
   outputFolder: build
   previewImage: {fileID: 0}
