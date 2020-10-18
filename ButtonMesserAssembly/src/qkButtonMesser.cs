@@ -69,15 +69,19 @@ public class qkButtonMesser : MonoBehaviour {
 
     private readonly string[] Ignoreds = new[]
     {
+        "Button Messer",
         "Challenge & Contact",
         "Countdown",
         "Cruel Countdown",
+        "Hold Ups",
+        "Lightspeed",
         "Micro-Modules",
         "Only Connect",
         "Risky Wires",
         "Rubik's Clock",
         "The Modkit",
-        "Ultimate Custom Night"
+        "Ultimate Custom Night",
+        "Word Search"
     };
 
     private readonly ModHandler[] SeparateHandle = new ModHandler[]
@@ -114,6 +118,9 @@ public class qkButtonMesser : MonoBehaviour {
     private bool ButtonSolved = false;
     private bool _solve = false;
     private bool Pressable = false;
+
+    [HideInInspector]
+    public bool TwitchPlaysActive;
 
     private bool _Enabled => SelfBomb == null || moduleID !=
         SelfBomb.GetComponentsInChildren<qkButtonMesser>(true).OrderByDescending(x => x.moduleID).ToList()[0].moduleID;
@@ -210,14 +217,14 @@ public class qkButtonMesser : MonoBehaviour {
     public void Start()
     {
         moduleID = ++_counter;
-        GetComponent<KMBossModule>().GetIgnoredModules("Button Messer", new string[] {"Button Messer"});
+        var AllIgnoreds = GetComponent<KMBossModule>().GetIgnoredModules("Button Messer", Ignoreds);
         SelfBomb = FindSelfBomb();
         var solveBTN = FindFromRoot("SolveButton");
         var handler = GetComponent<KMBombModule>();
         solveBTN.GetComponent<Selectable>().OnInteract += () =>
         {
             if (!Pressable) return false;
-            StopCoroutine(Starter(solveBTN));
+            StopCoroutine(Starter(solveBTN, AllIgnoreds));
             handler.GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, solveBTN.transform);
             solveBTN.GetComponent<KMSelectable>().AddInteractionPunch(.5f);
             ButtonSolved = true;
@@ -238,7 +245,26 @@ public class qkButtonMesser : MonoBehaviour {
             Destroy(FindFromRoot("PosState"));
             buttonRotation = FindFromRoot("SolveButton").transform.rotation;
         };
-        selfModules = SelfBomb.GetComponentsInChildren<BombComponent>(true).Where(m => m.ComponentType != ComponentTypeEnum.Empty && m.ComponentType != ComponentTypeEnum.Timer && !Ignoreds.Contains(m.GetModuleDisplayName())).ToArray();
+        StartCoroutine(Starter(solveBTN, AllIgnoreds));
+    }
+
+    private IEnumerator Starter(GameObject solveBTN, string[] AllIgnoreds)
+    {
+        yield return new WaitUntil(() => _done >= GetComponent<KMBombInfo>().GetModuleNames().Count);
+        yield return null;
+        solveBTN.SetActive(false);
+        _enable = true;
+        List<string> FinalIgnoreds = new List<string>();
+        foreach(string module in AllIgnoreds)
+        {
+            if(String.IsNullOrEmpty(module))
+            {
+                if (TwitchPlaysActive) continue;
+                break;
+            }
+            FinalIgnoreds.Add(module);
+        }
+        selfModules = SelfBomb.GetComponentsInChildren<BombComponent>(true).Where(m => m.ComponentType != ComponentTypeEnum.Empty && m.ComponentType != ComponentTypeEnum.Timer && !FinalIgnoreds.Contains(m.GetModuleDisplayName())).ToArray();
         foreach (BombComponent module in selfModules)
         {
             Transform ModuleCamera = SetupCamera(module);
@@ -249,9 +275,9 @@ public class qkButtonMesser : MonoBehaviour {
                 Selectables.Add(selectable);
                 Cameras.Add(selectable, ModuleCamera);
             }
-            foreach(ModHandler type in SeparateHandle)
+            foreach (ModHandler type in SeparateHandle)
             {
-                foreach(var selectable in module.GetComponentsInChildren(type.t, type.Inactive).Select(x => x.GetComponent<Selectable>()))
+                foreach (var selectable in module.GetComponentsInChildren(type.t, type.Inactive).Select(x => x.GetComponent<Selectable>()))
                 {
                     Selectables.Add(selectable);
                     Cameras.Add(selectable, ModuleCamera);
@@ -260,15 +286,6 @@ public class qkButtonMesser : MonoBehaviour {
         }
         Selectables = Selectables.Distinct().ToList();
         Selectables = Shuffle(Selectables);
-        StartCoroutine(Starter(solveBTN));
-    }
-
-    private IEnumerator Starter(GameObject solveBTN)
-    {
-        yield return new WaitUntil(() => _done >= GetComponent<KMBombInfo>().GetModuleNames().Count);
-        yield return null;
-        solveBTN.SetActive(false);
-        _enable = true;
         List<Selectable> remove = new List<Selectable>();
         foreach(Selectable selectable in Selectables)
         {
