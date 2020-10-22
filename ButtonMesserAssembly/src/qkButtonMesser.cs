@@ -8,6 +8,11 @@ using RNG = UnityEngine.Random;
 
 public class qkButtonMesser : MonoBehaviour {
 
+    private class MesserStuckException : Exception
+    {
+        public MesserStuckException(string msg) : base(msg) { }
+    }
+
     private Bomb FindSelfBomb()
     {
         var bombs = FindObjectsOfType<Bomb>();
@@ -92,6 +97,7 @@ public class qkButtonMesser : MonoBehaviour {
     };
 
     public bool _enable = false;
+    private const bool EnableStuckCommand = true;
 
     private List<int> Availables
     {
@@ -366,11 +372,18 @@ public class qkButtonMesser : MonoBehaviour {
     
     #pragma warning disable 414
     [HideInInspector]
-    public string TwitchHelpMessage = "Use '!{0} press solve' if the solve button is present!";
+    public string TwitchHelpMessage = "Use '!{0} press solve' if the solve button is present! If you got stuck on any point while doing the bomb by this module, use '!{0} stuck'";
     #pragma warning restore 414
     public IEnumerator ProcessTwitchCommand(string command)
     {
-        if(command.ToLowerInvariant()=="press solve")
+        command = command.ToLowerInvariant();
+        if (command == "stuck" && EnableStuckCommand)
+        {
+            Logger("Stuck on Twitch Plays");
+            yield return "sendtochat Please ping Qkrisi on Discord and tell him why it stuck";
+            throw new MesserStuckException("Received TP stuck command");
+        }
+        if (command=="press solve")
         {
             yield return null;
             if (!Pressable)

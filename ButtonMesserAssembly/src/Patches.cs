@@ -38,7 +38,7 @@ public class SolvePatch
 {
     public static void Prefix(BombComponent __instance)
     {
-        if (__instance.GetComponent<qkButtonMesser>() != null) __instance.GetComponent<qkButtonMesser>().ResetAll();
+        __instance.GetComponent<qkButtonMesser>()?.ResetAll();
     }
 }
 
