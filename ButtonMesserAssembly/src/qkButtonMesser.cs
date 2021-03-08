@@ -348,7 +348,8 @@ public class qkButtonMesser : MonoBehaviour {
 
     public void Update()
     {
-        if (GetComponent<KMBombInfo>().GetSolvableModuleIDs().All(module => module == "qkButtonMesser")) GetComponent<KMBombModule>().HandlePass();
+        var BombInfo = GetComponent<KMBombInfo>();
+        if (BombInfo.GetSolvableModuleIDs().Except(BombInfo.GetSolvedModuleIDs()).All(module => module == "qkButtonMesser")) GetComponent<KMBombModule>().HandlePass();
     }
     
     private Transform SetupCamera(BombComponent module)        //Origin: TwitchPlays
